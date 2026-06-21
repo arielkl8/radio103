@@ -17,7 +17,7 @@ interface CompleteEpisode {
   id: string;
   title: string;
   date: string;
-  embedUrl: string;
+  audioUrl: string;
   pageUrl: string;
 }
 
