@@ -29,13 +29,7 @@ export default function AudioPlayer({ audioUrl, title, onEnded }: Props) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
   const [savedPos, setSavedPos] = useState(0);
-  const [isIOS, setIsIOS] = useState(false);
-
-  useEffect(() => {
-    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
-  }, []);
 
   // Reset when URL changes
   useEffect(() => {
@@ -43,7 +37,6 @@ export default function AudioPlayer({ audioUrl, title, onEnded }: Props) {
     if (!audio) return;
     audio.pause();
     audio.src = audioUrl;
-    audio.volume = volume;
     audio.muted = muted;
     setPlaying(false);
     setBuffering(false);
@@ -189,15 +182,6 @@ export default function AudioPlayer({ audioUrl, title, onEnded }: Props) {
     setMuted(next);
   };
 
-  const changeVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = parseFloat(e.target.value);
-    setVolume(v);
-    if (audioRef.current) {
-      audioRef.current.volume = v;
-      if (v > 0 && muted) { audioRef.current.muted = false; setMuted(false); }
-    }
-  };
-
   return (
     <div className="bg-[#0d1b2a] border border-brand-border rounded-xl p-4 shadow-lg select-none">
       {/* playsInline prevents iOS from hijacking to fullscreen; x-webkit-airplay for AirPlay */}
@@ -220,8 +204,9 @@ export default function AudioPlayer({ audioUrl, title, onEnded }: Props) {
         </button>
       )}
 
-      {/* Progress bar — tall touch target, pointer events for drag on all devices */}
+      {/* Progress bar — dir="ltr" forces left→right fill regardless of page RTL */}
       <div
+        dir="ltr"
         ref={progressRef}
         className="relative flex items-center cursor-pointer mb-1 touch-none"
         style={{ height: '28px' }}
@@ -275,23 +260,16 @@ export default function AudioPlayer({ audioUrl, title, onEnded }: Props) {
         </button>
       </div>
 
-      {/* Volume — hidden on iOS (system controls volume, JS has no effect) */}
-      {!isIOS && (
-        <div className="flex items-center gap-2 mt-4">
-          <button
-            onClick={toggleMute}
-            className="text-gray-400 hover:text-white transition text-base w-6 text-center flex-shrink-0"
-          >
-            {muted || volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}
-          </button>
-          <input
-            type="range" min={0} max={1} step={0.02}
-            value={muted ? 0 : volume}
-            onChange={changeVolume}
-            className="flex-1 h-1 accent-red-500 cursor-pointer"
-          />
-        </div>
-      )}
+      {/* Mute button only — volume slider removed */}
+      <div className="flex justify-center mt-4">
+        <button
+          onClick={toggleMute}
+          className="text-gray-400 hover:text-white active:text-white transition text-xl p-2"
+          title={muted ? 'בטל השתקה' : 'השתק'}
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
+      </div>
     </div>
   );
 }
