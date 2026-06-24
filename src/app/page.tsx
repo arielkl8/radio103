@@ -23,7 +23,7 @@ interface CompleteEpisode {
 
 type Tab = 'segments' | 'complete';
 
-const REFRESH_INTERVAL = 5 * 60 * 1000;
+const REFRESH_INTERVAL = 15 * 60 * 1000;
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>('segments');
@@ -219,7 +219,7 @@ export default function Home() {
       </main>
 
       <footer className="text-center text-gray-600 text-xs py-6 border-t border-brand-border mt-4">
-        מקור: 103FM • מתעדכן אוטומטית כל 5 דקות
+        מקור: 103FM • מתעדכן אוטומטית כל 15 דקות
       </footer>
     </div>
   );
