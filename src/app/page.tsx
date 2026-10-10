@@ -24,6 +24,8 @@ interface CompleteEpisode {
 type Tab = 'segments' | 'complete';
 
 const REFRESH_INTERVAL = 15 * 60 * 1000;
+// Empty on Vercel (same-origin API); set to the Vercel URL for the Firebase static build
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>('segments');
@@ -47,7 +49,7 @@ export default function Home() {
       setEpisodesError(null);
     }
     try {
-      const res = await fetch('/api/episodes');
+      const res = await fetch(`${API_BASE}/api/episodes`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setEpisodes((prev) => {
@@ -72,7 +74,7 @@ export default function Home() {
       setCompleteError(null);
     }
     try {
-      const res = await fetch('/api/complete-episodes');
+      const res = await fetch(`${API_BASE}/api/complete-episodes`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setComplete((prev) => {
