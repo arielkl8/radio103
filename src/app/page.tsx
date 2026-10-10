@@ -42,32 +42,49 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadEpisodes = useCallback(async (silent = false) => {
-    if (!silent) setEpisodesLoading(true);
-    setEpisodesError(null);
+    if (!silent) {
+      setEpisodesLoading(true);
+      setEpisodesError(null);
+    }
     try {
       const res = await fetch('/api/episodes');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setEpisodes(data.episodes || []);
+      setEpisodes((prev) => {
+        // Keep episodes that dropped off the feed so a playing player isn't unmounted
+        const next: Episode[] = data.episodes || [];
+        const ids = new Set(next.map((ep) => ep.id));
+        return [...next, ...prev.filter((ep) => !ids.has(ep.id))];
+      });
+      setEpisodesError(null);
       setLastUpdated(new Date());
     } catch (e: any) {
-      setEpisodesError(e.message || 'שגיאה בטעינת הקטעים');
+      // Background refresh failures keep the current list (and any playing audio) intact
+      if (!silent) setEpisodesError(e.message || 'שגיאה בטעינת הקטעים');
     } finally {
       setEpisodesLoading(false);
     }
   }, []);
 
-  const loadComplete = useCallback(async () => {
-    setCompleteLoading(true);
-    setCompleteError(null);
+  const loadComplete = useCallback(async (silent = false) => {
+    if (!silent) {
+      setCompleteLoading(true);
+      setCompleteError(null);
+    }
     try {
       const res = await fetch('/api/complete-episodes');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setComplete(data.episodes || []);
+      setComplete((prev) => {
+        // Keep episodes that dropped off the list so a playing player isn't unmounted
+        const next: CompleteEpisode[] = data.episodes || [];
+        const ids = new Set(next.map((ep) => ep.id));
+        return [...next, ...prev.filter((ep) => !ids.has(ep.id))];
+      });
+      setCompleteError(null);
       setCompleteFetched(true);
     } catch (e: any) {
-      setCompleteError(e.message || 'שגיאה בטעינת התוכניות המלאות');
+      if (!silent) setCompleteError(e.message || 'שגיאה בטעינת התוכניות המלאות');
     } finally {
       setCompleteLoading(false);
     }
@@ -85,7 +102,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!completeFetched) return;
-    const id = setInterval(() => loadComplete(), REFRESH_INTERVAL);
+    const id = setInterval(() => loadComplete(true), REFRESH_INTERVAL);
     return () => clearInterval(id);
   }, [completeFetched, loadComplete]);
 
