@@ -26,6 +26,9 @@ type Tab = 'segments' | 'complete';
 const REFRESH_INTERVAL = 15 * 60 * 1000;
 // Empty on Vercel (same-origin API); set to the Vercel URL for the Firebase static build
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
+// Returning to the app after this long in the background counts as a fresh launch
+const RESUME_REFRESH_AFTER = 60 * 1000;
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>('segments');
@@ -37,7 +40,6 @@ export default function Home() {
   const [complete, setComplete] = useState<CompleteEpisode[]>([]);
   const [completeLoading, setCompleteLoading] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
-  const [completeFetched, setCompleteFetched] = useState(false);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -49,7 +51,7 @@ export default function Home() {
       setEpisodesError(null);
     }
     try {
-      const res = await fetch(`${API_BASE}/api/episodes`);
+      const res = await fetch(`${API_BASE}/api/episodes?t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setEpisodes((prev) => {
@@ -74,7 +76,7 @@ export default function Home() {
       setCompleteError(null);
     }
     try {
-      const res = await fetch(`${API_BASE}/api/complete-episodes`);
+      const res = await fetch(`${API_BASE}/api/complete-episodes?t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setComplete((prev) => {
@@ -84,7 +86,6 @@ export default function Home() {
         return [...next, ...prev.filter((ep) => !ids.has(ep.id))];
       });
       setCompleteError(null);
-      setCompleteFetched(true);
     } catch (e: any) {
       if (!silent) setCompleteError(e.message || 'שגיאה בטעינת התוכניות המלאות');
     } finally {
@@ -92,21 +93,37 @@ export default function Home() {
     }
   }, []);
 
-  useEffect(() => {
-    loadEpisodes();
-    const id = setInterval(() => loadEpisodes(true), REFRESH_INTERVAL);
-    return () => clearInterval(id);
-  }, [loadEpisodes]);
+  const refreshAll = useCallback((silent = false) => {
+    loadEpisodes(silent);
+    loadComplete(silent);
+  }, [loadEpisodes, loadComplete]);
 
+  // Every app launch: refresh both segments and complete programs
   useEffect(() => {
-    if (tab === 'complete' && !completeFetched) loadComplete();
-  }, [tab, completeFetched, loadComplete]);
+    refreshAll();
+    const id = setInterval(() => refreshAll(true), REFRESH_INTERVAL);
 
-  useEffect(() => {
-    if (!completeFetched) return;
-    const id = setInterval(() => loadComplete(true), REFRESH_INTERVAL);
-    return () => clearInterval(id);
-  }, [completeFetched, loadComplete]);
+    // Re-opening the app from the background also refreshes (silently, so playback continues)
+    let hiddenAt: number | null = null;
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+      } else if (hiddenAt !== null && Date.now() - hiddenAt > RESUME_REFRESH_AFTER) {
+        hiddenAt = null;
+        refreshAll(true);
+      }
+    };
+    // pageshow with persisted=true = page restored from the back/forward cache
+    const onPageShow = (e: PageTransitionEvent) => { if (e.persisted) refreshAll(true); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pageshow', onPageShow);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pageshow', onPageShow);
+    };
+  }, [refreshAll]);
 
   const filteredEpisodes = episodes.filter(
     (ep) => !searchQuery || ep.title.includes(searchQuery) || ep.description.includes(searchQuery)
@@ -136,11 +153,11 @@ export default function Home() {
             <div className="w-10 h-10 bg-brand-red rounded-lg flex items-center justify-center text-xl shadow">🎙</div>
             <div>
               <h1 className="text-white font-bold text-lg leading-none">ינון מגל ובן כספית</h1>
-              <p className="text-gray-400 text-xs mt-0.5">103FM • ראשון–חמישי 09:00–11:00</p>
+              <p className="text-gray-400 text-xs mt-0.5">103FM • ראשון–חמישי 09:00–11:00{APP_VERSION && <span className="text-gray-500"> • V{APP_VERSION}</span>}</p>
             </div>
           </div>
           <button
-            onClick={() => tab === 'segments' ? loadEpisodes() : loadComplete()}
+            onClick={() => refreshAll()}
             className="text-xs text-gray-400 hover:text-white flex items-center gap-1 bg-brand-border hover:bg-blue-900 px-3 py-1.5 rounded-lg transition"
           >
             🔄 רענן
@@ -238,7 +255,7 @@ export default function Home() {
       </main>
 
       <footer className="text-center text-gray-600 text-xs py-6 border-t border-brand-border mt-4">
-        מקור: 103FM • מתעדכן אוטומטית כל 15 דקות
+        מקור: 103FM • מתעדכן בכל פתיחה ואוטומטית כל 15 דקות{APP_VERSION && ` • גרסה V${APP_VERSION}`}
       </footer>
     </div>
   );

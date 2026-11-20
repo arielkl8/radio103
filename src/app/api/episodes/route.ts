@@ -16,7 +16,7 @@ export async function GET() {
   try {
     const res = await fetch(RSS_URL, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Radio103App/1.0)' },
-      next: { revalidate: 300 },
+      next: { revalidate: 60 },
     });
     if (!res.ok) throw new Error(`RSS fetch failed: ${res.status}`);
 
